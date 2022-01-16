@@ -1,5 +1,4 @@
-from brownie import config, network, interface
-from eth_utils import currency
+from brownie import accounts, config, network, interface
 from scripts.get_weth import get_weth
 from scripts.helpful_scripts import get_account
 from web3 import Web3
@@ -54,13 +53,33 @@ def get_asset_price(price_feed_address):
     return float(latest_price)
 
 
-def repay_all(amount, lending_pool, account):
-    approve_erc20(
-        Web3.toWei(amount, "ether"),
-        lending_pool,
-        config["networks"][network.show_active()]["aave_dai_token"],
-        account,
+def borrow_erc20(lending_pool, amount, account, erc20_address=None):
+    erc20_address = (
+        erc20_address
+        if erc20_address
+        else config["networks"][network.show_active()]["aave_dai_token"]
     )
+    # 1 is stable interest rate
+    # 0 is the referral code
+    transaction = lending_pool.borrow(
+        erc20_address,
+        Web3.toWei(amount, "ether"),
+        1,
+        0,
+        account.address,
+        {"from": account},
+    )
+    transaction.wait(1)
+    print(f"Congratulations! We have just borrowed {amount}")
+
+
+def repay_all(amount, lending_pool, account):
+    # approve_erc20(
+    #     Web3.toWei(amount, "ether"),
+    #     lending_pool,
+    #     config["networks"][network.show_active()]["aave_dai_token"],
+    #     account,
+    # )
 
     repay_tx = lending_pool.repay(
         config["networks"][network.show_active()]["aave_dai_token"],
@@ -73,16 +92,8 @@ def repay_all(amount, lending_pool, account):
     print("DEBT REPAID!")
 
 
-# def withdraw(asset, amount, address):
-#     approve_erc20(
-#         Web3.toWei(amount, "ether"),
-#     )
-
-#     withdraw = lending_pool.withdraw
-
-
 def main():
-    account = get_account()
+    account = accounts[0]
     erc20_address = config["networks"][network.show_active()]["weth_token"]
     # get_weth()
     if network.show_active() in ["mainnet-fork"]:
@@ -92,10 +103,7 @@ def main():
     # Approve sending out erc20 tokens
     approve_erc20(amount, lending_pool.address, erc20_address, account)
     print("Depositing...")
-    tx = lending_pool.deposit(
-        erc20_address, amount, account.address, 0, {"from": account}
-    )
-    tx.wait(1)
+    lending_pool.deposit(erc20_address, amount, account.address, 0, {"from": account})
     print("Deposited!")
     # ... how much can we borrow?
     borrowable_eth, total_debt = get_borrowable_data(lending_pool, account)
@@ -107,20 +115,17 @@ def main():
     amount_dai_to_borrow = (1 / dai_eth_price) * (borrowable_eth * 0.95)
     # 0.95 = 95% of borrowable eth. The lower the percentage, the safer the health factor
     print(f"We are going to borrow {amount_dai_to_borrow} DAI")
-    dai_address = config["networks"][network.show_active()]["aave_dai_token"]
-    borrow_tx = lending_pool.borrow(
-        dai_address,
-        Web3.toWei(amount_dai_to_borrow, "ether"),
-        1,
-        0,
-        account.address,
-        {"from": account},
-    )
-    borrow_tx.wait(1)
-    print("We borrowed some DAI!")
-    get_borrowable_data(lending_pool, account)
+    borrow_erc20(lending_pool, amount_dai_to_borrow, account)
+    time.sleep(10)
+    print(f"BORROWED ${total_debt}\n")
+    time.sleep(10)
+    print("TIME TO REPAY DEBT\n")
+    # amount_erc20_to_repay = (1 / erc20_eth_price) * (total_debt_eth * 0.95)
+    time.sleep(10)
 
-    # REPAY ALL DEBT
-    repay_all(amount, lending_pool, account)
+    uint = -1 + 2 ** 256
+    repay_all(uint, lending_pool, account)
+
+    # repay_all(amount_dai_to_borrow, lending_pool, account)
     print("You just deposited, borrowed and repayed with AAVE, Brownie, and Chainlink!")
     get_borrowable_data(lending_pool, account)
