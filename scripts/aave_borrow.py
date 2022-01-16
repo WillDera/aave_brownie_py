@@ -34,7 +34,7 @@ def get_borrowable_data(lending_pool, account):
         total_debt_eth,
         available_borrow_eth,
         current_liquidation_threshold,
-        ltv,
+        tlv,
         health_factor,
     ) = lending_pool.getUserAccountData(account.address)
     available_borrow_eth = Web3.fromWei(available_borrow_eth, "ether")
@@ -43,7 +43,7 @@ def get_borrowable_data(lending_pool, account):
     print(f"You have {total_collateral_eth} worth of ETH deposited!")
     print(f"You can borrow {available_borrow_eth} worth of ETH!")
     print(f"You have {total_debt_eth} worth of ETH borrowed!")
-    return (float(available_borrow_eth), float(total_debt_eth))
+    return (float(Web3.toWei(available_borrow_eth, "ether")), float(total_debt_eth))
 
 
 def get_asset_price(price_feed_address):
@@ -52,6 +52,33 @@ def get_asset_price(price_feed_address):
     converted_latest_price = Web3.fromWei(latest_price, "ether")
     print(f"The DAI/ETH price is {converted_latest_price}")
     return float(latest_price)
+
+
+def repay_all(amount, lending_pool, account):
+    approve_erc20(
+        Web3.toWei(amount, "ether"),
+        lending_pool,
+        config["networks"][network.show_active()]["aave_dai_token"],
+        account,
+    )
+
+    repay_tx = lending_pool.repay(
+        config["networks"][network.show_active()]["aave_dai_token"],
+        amount,
+        1,
+        account.address,
+        {"from": account},
+    )
+    repay_tx.wait(1)
+    print("DEBT REPAID!")
+
+
+# def withdraw(asset, amount, address):
+#     approve_erc20(
+#         Web3.toWei(amount, "ether"),
+#     )
+
+#     withdraw = lending_pool.withdraw
 
 
 def main():
@@ -79,8 +106,8 @@ def main():
     )
     amount_dai_to_borrow = (1 / dai_eth_price) * (borrowable_eth * 0.95)
     # 0.95 = 95% of borrowable eth. The lower the percentage, the safer the health factor
-    print(f"We are going to borrow {amount_dai_to_borrow} dai")
-    dai_address = config["networks"][network.show_active()]["dai_token"]
+    print(f"We are going to borrow {amount_dai_to_borrow} DAI")
+    dai_address = config["networks"][network.show_active()]["aave_dai_token"]
     borrow_tx = lending_pool.borrow(
         dai_address,
         Web3.toWei(amount_dai_to_borrow, "ether"),
@@ -91,4 +118,9 @@ def main():
     )
     borrow_tx.wait(1)
     print("We borrowed some DAI!")
+    get_borrowable_data(lending_pool, account)
+
+    # REPAY ALL DEBT
+    repay_all(amount, lending_pool, account)
+    print("You just deposited, borrowed and repayed with AAVE, Brownie, and Chainlink!")
     get_borrowable_data(lending_pool, account)

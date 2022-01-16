@@ -16,7 +16,7 @@ compiler:
 # automatically fetch contract sources from Etherscan
 autofetch_sources: True
 dotenv: .env
-# Change to trye to verify smart contracts
+# Change to true to verify smart contracts
 verify: False
 # set a custom mnemonic for the development network
 networks:
