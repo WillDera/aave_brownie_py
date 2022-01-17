@@ -4,6 +4,7 @@
 2. Borrow some asset with the ETH collateral (DONE)
    1. Sell the borrowed asset (Short selling)
 3. Repay/Pay back everything.
+4. Withdraw all funds.
 
 Testing:
 Integration test: Kovan
